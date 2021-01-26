@@ -1,0 +1,12 @@
+SETUP INSTRUCTIONS: 
+1. Install python3.6+ version.
+2. Unzip the delivery file and open the command prompt/Terminal in the delivery folder (The folder where all the files are).
+3. Rename sample-config.json file to config.json.
+NOTE: You will need your twitter account approved as developer account for the below step.
+4. Create an app on twitter developer portal and get your twitter_api_key, twitter_api_key_secret,
+    twitter_access_token and twitter_access_token_secret and put them in config.json file.
+5. Use this guide --> ( https://core.telegram.org/api/obtaining_api_id#obtaining-api-id ) to get api_id and api_hash for telegram.
+6. Enter your telegram mobile number, target_twitter accounts to monitor and also the destination channel name in config.json.
+7. Run ( pip install -r requirements.txt ) to install the required packages.
+8. Use ( python main.py ) to run the bot and see it in action.
+9. Let me know if you have some confusion or problem.

@@ -1,0 +1,16 @@
+{
+    "TWITTER_API_KEY": "4B9mwfjV",
+    "TWITTER_API_KEY_SECRET": "",
+    "TWITTER_ACCESS_TOKEN": "1304474209905782784",
+    "TWITTER_ACCESS_TOKEN_SECRET": "aIgK1Ds95fw1WTIG",
+    "TELEGRAM_API_ID": 15,
+    "TELEGRAM_API_HASH": "",
+    "TELEGRAM_PHONE_NUMBER": "+9230",
+    "TARGET_TWITTER_ACCOUNTS": [
+        "@Gather_Network",
+        "@Reggi3J",
+        "@rehmanali944228"
+    ],
+    "DEST_TG_CHANNEL_NAME": "Mr",
+    "CHROME_DRIVER_PATH": "/home/virchual/webdrivers/chromedriver"
+}

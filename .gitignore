@@ -1,0 +1,8 @@
+*.zip
+config.json
+*.session
+__pycach*
+.vscod*
+tests.py
+logs/*
+graphs_as_pngs
