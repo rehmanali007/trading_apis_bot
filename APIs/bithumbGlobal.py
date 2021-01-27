@@ -13,14 +13,16 @@ except ModuleNotFoundError:
     from coingecko import CoinGecko
 import collections
 import requests
-from models.global_enums import MessageTypes, Job
+from models.global_enums import MessageTypes, Job, Synchronizer, Signal, Threads
 
 
 class BithumbAPI:
-    def __init__(self, queue):
+    def __init__(self, queue, sync, signals_queue):
         f = open('config.json', 'r')
         self.config = json.load(f)
         self.queue = queue
+        self.sync = sync
+        self.signals_queue = signals_queue
         self.session = requests.Session()
         self.loginfo = logging.getLogger(' Bithumb API ').warning
         self.logerror = logging.getLogger(' Bithumb API ').error
@@ -38,7 +40,8 @@ class BithumbAPI:
     async def main(self):
         await self.cache_trades()
         while True:
-            # Use the line below to control after how much time the data will be aggregated.
+            while not self.sync.can_fetch_data:
+                await asyncio.sleep(0.2)
             target_time = dt.utcnow() + timedelta(minutes=5)
             total_buy = 0
             total_sell = 0
@@ -82,8 +85,16 @@ class BithumbAPI:
             job = Job()
             job.message_type = MessageTypes.TEXT_MESSAGE
             job.message = message
+            signal = Signal(Threads.BITHUMB)
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
+            while not self.sync.all_data_ready:
+                await asyncio.sleep(0.1)
             self.queue.put(job)
-            self.loginfo('[+] Bithumb API data added to the queue!')
+            signal = Signal(Threads.BITHUMB)
+            signal.is_data_sent = True
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
 
     async def create_messages(self, trades):
         messages = []
@@ -126,5 +137,6 @@ class BithumbAPI:
 
 if __name__ == "__main__":
     q = Queue()
-    api = BithumbAPI(q)
+    s = Synchronizer()
+    api = BithumbAPI(q, s, q)
     api.start()

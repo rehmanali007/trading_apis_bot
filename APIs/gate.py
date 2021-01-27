@@ -13,12 +13,14 @@ except ModuleNotFoundError:
 # from APIs.coingecko import CoinGecko
 from emoji import emojize
 import collections
-from models.global_enums import MessageTypes, Job
+from models.global_enums import MessageTypes, Job, Synchronizer, Threads, Signal
 
 
 class Gate:
-    def __init__(self, queue):
+    def __init__(self, queue, sync, signals_queue):
         self.queue = queue
+        self.signals_queue = signals_queue
+        self.sync = sync
         self.gth_usdt = "https://data.gateapi.io/api2/1/tradeHistory/gth_usdt"
         self.gth_eth = "https://data.gateapi.io/api2/1/tradeHistory/gth_eth"
         self.loop = asyncio.new_event_loop()
@@ -35,6 +37,8 @@ class Gate:
     async def main(self):
         await self.cache_usdt_trades()
         while True:
+            while not self.sync.can_fetch_data:
+                await asyncio.sleep(0.1)
             target_time = dt.utcnow() + timedelta(minutes=5)
             total_sell_amount = 0
             total_buy_amount = 0
@@ -77,7 +81,16 @@ class Gate:
             job = Job()
             job.message_type = MessageTypes.TEXT_MESSAGE
             job.message = message
+            signal = Signal(Threads.GATE)
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
+            while not self.sync.all_data_ready:
+                await asyncio.sleep(0.1)
             self.queue.put(job)
+            signal = Signal(Threads.GATE)
+            signal.is_data_sent = True
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
             self.loginfo('[+] Gate API data added to the queue!')
 
     async def create_messages_for_usdt(self, trades):
@@ -122,5 +135,6 @@ class Gate:
 
 if __name__ == "__main__":
     q = Queue()
-    g = Gate(q)
+    s = Synchronizer()
+    g = Gate(q, s, q)
     g.start()

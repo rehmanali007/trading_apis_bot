@@ -1,4 +1,3 @@
-
 import requests
 import json
 import asyncio
@@ -14,18 +13,20 @@ except ModuleNotFoundError:
     from coingecko import CoinGecko
     from utils import get_circles
 import collections
-from models.global_enums import MessageTypes, Job
+from models.global_enums import MessageTypes, Job, Synchronizer, Signal, Threads
 
 
 class HooAPI:
-    def __init__(self, queue: Queue):
+    def __init__(self, queue: Queue, sync, signals_queue):
         f = open('config.json', 'r')
         self.config = json.load(f)
+        self.signals_queue = signals_queue
         self.host = "https://api.hoolgd.com"
         self.session = requests.Session()
         self.symbol = 'GTH-USDT'
         self.loginfo = logging.getLogger(' Hoo ').warning
         self.queue = queue
+        self.sync = sync
         self.exchange_name = 'Hoo.com'
         self.coingecko = CoinGecko()
         self.trade_check_time = 2
@@ -38,6 +39,8 @@ class HooAPI:
     async def main(self):
         await self.cache_trades()
         while True:
+            while not self.sync.can_fetch_data:
+                await asyncio.sleep(0.2)
             # The target time when the data will be calculated and sent
             target_time = dt.utcnow() + timedelta(minutes=5)
             total_sell_amount = 0
@@ -84,7 +87,16 @@ class HooAPI:
             job = Job()
             job.message_type = MessageTypes.TEXT_MESSAGE
             job.message = message
+            signal = Signal(Threads.HOO)
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
+            while not self.sync.all_data_ready:
+                await asyncio.sleep(0.1)
             self.queue.put(job)
+            signal = Signal(Threads.HOO)
+            signal.is_data_sent = True
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
             self.loginfo('[+] Hoo API data added to the queue!')
 
     async def cache_trades(self):
@@ -112,5 +124,6 @@ class HooAPI:
 
 if __name__ == "__main__":
     q = Queue()
-    api = HooAPI(q)
+    s = Synchronizer()
+    api = HooAPI(q, s, q)
     api.start()

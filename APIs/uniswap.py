@@ -10,14 +10,15 @@ except ModuleNotFoundError:
     from coingecko import CoinGecko
 from emoji import emojize
 import collections
-from models.global_enums import MessageTypes, Job
+from models.global_enums import MessageTypes, Job, Synchronizer, Signal, Threads
 import requests
 
 
 class UniSwap:
-    def __init__(self, queue):
+    def __init__(self, queue, sync, signals_queue):
         self.queue = queue
-        # pg_endpoint = 'https://thegraph.com/explorer/subgraph/uniswap/uniswap-v2'
+        self.signals_queue = signals_queue
+        self.sync = sync
         endpoint = 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2'
         self.client = GraphqlClient(
             endpoint=endpoint)
@@ -38,6 +39,8 @@ class UniSwap:
         self.loginfo('[+] UniSwap Thread is ready!')
         await self.cache_swaps()
         while True:
+            while not self.sync.can_fetch_data:
+                await asyncio.sleep(0.2)
             target_time = dt.utcnow() + timedelta(minutes=5)
             # Total_sell_amount will store the total sell values of the orders found in each loop
             total_sell_amount = float(0)
@@ -97,8 +100,16 @@ class UniSwap:
             job = Job()
             job.message_type = MessageTypes.TEXT_MESSAGE
             job.message = message
+            signal = Signal(Threads.UNISWAP)
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
+            while not self.sync.all_data_ready:
+                await asyncio.sleep(0.1)
             self.queue.put(job)
-            self.loginfo('[+] Uniswap API data added to the queue!')
+            signal = Signal(Threads.UNISWAP)
+            signal.is_data_sent = True
+            signal.is_data_ready = True
+            self.signals_queue.put(signal)
             # await asyncio.sleep(self.itter_time)
 
     async def create_messages(self, swaps):
@@ -191,6 +202,9 @@ class UniSwap:
             except requests.exceptions.ConnectionError:
                 await asyncio.sleep(1)
                 continue
+            except requests.exceptions.HTTPError:
+                await asyncio.sleep(1)
+                continue
             swaps = []
             if 'data' in data:
                 for swap in data['data']['swaps']:
@@ -258,5 +272,6 @@ class UniSwap:
 if __name__ == "__main__":
     import queue
     q = queue.Queue()
-    uni = UniSwap(q)
+    s = Synchronizer()
+    uni = UniSwap(q, s, q)
     uni.start()

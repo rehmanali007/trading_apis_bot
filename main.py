@@ -16,6 +16,8 @@ from models.hour_post import Hourly_post
 from models.etherscan import Etherscan
 from tg.reposter import Reposter
 from models.graph import FetchGraph
+from models.global_enums import Synchronizer
+from APIs.sync import ControlThread
 
 
 if not os.path.exists('./logs'):
@@ -39,6 +41,7 @@ client = TelegramClient('client', config.get("TELEGRAM_API_ID"),
                         config.get("TELEGRAM_API_HASH"))
 # ALl the APIs messages should be gone through this queue
 message_queue = Queue()
+signals_queue = Queue()
 
 eth = Etherscan()
 # To get the holders value use value = next(get_holders)
@@ -57,18 +60,20 @@ threading.Thread(target=word_counter.start).start()
 sender = Sender(client, message_queue)
 threading.Thread(target=sender.start).start()
 
-
+sync = Synchronizer()
+control = ControlThread(signals_queue, sync)
+threading.Thread(target=control.start).start()
 # Start 4 APIs threads
-uniswap = UniSwap(message_queue)
+uniswap = UniSwap(message_queue, sync, signals_queue)
 threading.Thread(target=uniswap.start).start()
 
-hoo = HooAPI(message_queue)
+hoo = HooAPI(message_queue, sync, signals_queue)
 threading.Thread(target=hoo.start).start()
 
-gate = Gate(message_queue)
+gate = Gate(message_queue, sync, signals_queue)
 threading.Thread(target=gate.start).start()
 
-bithumb = BithumbAPI(message_queue)
+bithumb = BithumbAPI(message_queue, sync, signals_queue)
 threading.Thread(target=bithumb.start).start()
 
 
